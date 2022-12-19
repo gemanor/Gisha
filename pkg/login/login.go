@@ -6,18 +6,29 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"os/exec"
 	"os/user"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 )
 
+type LoginOptions struct {
+	AppID        string
+	ClientID     string
+	ClientSecret string
+	Scopes       string
+	AuthURL      string
+	TokenURL     string
+}
+
 var oauthConfig *oauth2.Config
 var wg sync.WaitGroup
+var token *oauth2.Token
+var tokenErr error = nil
 
 func getRandomAvailablePort() (int, error) {
 	// Bind to port 0 to choose a random available port
@@ -54,7 +65,7 @@ func readRefreshToken() (string, error) {
 }
 
 // Login starts the OAuth flow and logs the user in to their account on the third-party service.
-func Login(clientID string, clientSecret string, scopes []string, authURL string, tokenURL string) error {
+func Login(options LoginOptions) (*oauth2.Token, error) {
 	// generate random available port number
 	port, err := getRandomAvailablePort()
 	if err != nil {
@@ -63,14 +74,14 @@ func Login(clientID string, clientSecret string, scopes []string, authURL string
 
 	// Set the OAuth configuration for the third-party service
 	oauthConfig = &oauth2.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
+		ClientID:     options.ClientID,
+		ClientSecret: options.ClientSecret,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  authURL,
-			TokenURL: tokenURL,
+			AuthURL:  options.AuthURL,
+			TokenURL: options.TokenURL,
 		},
 		RedirectURL: fmt.Sprintf("http://localhost:%d/oauth", port),
-		Scopes:      scopes,
+		Scopes:      strings.Split(options.Scopes, ","),
 	}
 
 	// Check for a refresh token in the keyring
@@ -96,7 +107,7 @@ func Login(clientID string, clientSecret string, scopes []string, authURL string
 	}()
 
 	// Open the third-party service's OAuth login page in the user's web browser
-	url := oauthConfig.AuthCodeURL("state", oauth2.AccessTypeOnline)
+	url := oauthConfig.AuthCodeURL("state", oauth2.AccessTypeOffline)
 	if err := openURL(url); err != nil {
 		log.Fatalf("Failed to open URL in web browser: %v", err)
 	}
@@ -106,7 +117,7 @@ func Login(clientID string, clientSecret string, scopes []string, authURL string
 	httpServer.Shutdown(
 		context.Background(),
 	)
-	return nil
+	return token, tokenErr
 }
 
 // Refresh refreshes the user's access token when it expires.
@@ -127,27 +138,30 @@ func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	if code == "" {
 		http.Error(w, "Authorization code not found", http.StatusBadRequest)
+		tokenErr = fmt.Errorf("authorization code not found")
 		wg.Done()
 		return
 	}
 
 	// Use the authorization code to get an access token
-	token, err := oauthConfig.Exchange(context.Background(), code)
+	response, err := oauthConfig.Exchange(context.Background(), code)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		tokenErr = err
 		wg.Done()
 		return
 	}
 
 	// Save the refresh token in the keyring
-	if err := saveRefreshToken(token.RefreshToken); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		wg.Done()
-		return
-	}
+	// if err := saveRefreshToken(token.RefreshToken); err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	tokenErr = err
+	// 	wg.Done()
+	// 	return
+	// }
 
-	// Print the access token to the user
-	fmt.Fprintln(os.Stdout, "Token:", token.AccessToken)
+	// Store the token, and signal that the OAuth flow is complete
+	token = response
 	wg.Done()
 }
 
