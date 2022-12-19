@@ -30,7 +30,7 @@ func TestLogin(t *testing.T) {
 	type args struct {
 		clientID     string
 		clientSecret string
-		scopes       []string
+		scopes       string
 		authURL      string
 		tokenURL     string
 	}
@@ -39,11 +39,19 @@ func TestLogin(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{name: "string", args: args{clientID: "string", clientSecret: "string", scopes: []string{"string"}, authURL: "https://localhost:8080/oauth", tokenURL: "https://localhost:8080/oauth"}, wantErr: false},
+		{name: "string", args: args{clientID: "string", clientSecret: "string", scopes: "string", authURL: "https://localhost:8080/oauth", tokenURL: "https://localhost:8080/oauth"}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := Login(tt.args.clientID, tt.args.clientSecret, tt.args.scopes, tt.args.authURL, tt.args.tokenURL); (err != nil) != tt.wantErr {
+			options := LoginOptions{
+				ClientID:     tt.args.clientID,
+				ClientSecret: tt.args.clientSecret,
+				Scopes:       tt.args.scopes,
+				AuthURL:      tt.args.authURL,
+				TokenURL:     tt.args.tokenURL,
+			}
+			_, err := Login(options)
+			if err != nil {
 				t.Errorf("Login() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
