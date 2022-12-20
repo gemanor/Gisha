@@ -39,7 +39,7 @@ func TestLogin(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{name: "string", args: args{clientID: "string", clientSecret: "string", scopes: "string", authURL: "https://localhost:8080/oauth", tokenURL: "https://localhost:8080/oauth"}, wantErr: false},
+		{name: "string", args: args{clientID: "", clientSecret: "", scopes: "https://www.googleapis.com/auth/spreadsheets.readonly", authURL: "https://accounts.google.com/o/oauth2/v2/auth", tokenURL: "https://oauth2.googleapis.com/token"}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -49,6 +49,7 @@ func TestLogin(t *testing.T) {
 				Scopes:       tt.args.scopes,
 				AuthURL:      tt.args.authURL,
 				TokenURL:     tt.args.tokenURL,
+				AppID:        "gisha_test",
 			}
 			_, err := Login(options)
 			if err != nil {
