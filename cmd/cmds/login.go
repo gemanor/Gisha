@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var provider gisha.Provider
+
 var loginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Login to the service",
@@ -41,5 +43,6 @@ func init() {
 	loginCmd.MarkFlagRequired("auth-url")
 	loginCmd.Flags().StringP("token-url", "t", "", "Token URL")
 	loginCmd.MarkFlagRequired("token-url")
+
 	rootCmd.AddCommand(loginCmd)
 }
